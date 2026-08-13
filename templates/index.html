@@ -5,773 +5,144 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Northstar Support Deflection Chatbot MVP. Instantly track your order status, check catalog stock levels, and escalate issues.">
     <title>Northstar Support Assistant</title>
-    
-    <!-- Google Fonts: Inter for general text, Outfit for headings -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
-
-    <style>
-        /* ==========================================================================
-           DESIGN SYSTEM & VARIABLES
-           ========================================================================== */
-        :root {
-            /* Palette colors */
-            --bg-dark: #090d16;
-            --bg-card: rgba(17, 24, 39, 0.7);
-            --border-glow: rgba(99, 102, 241, 0.2);
-            --border-light: rgba(255, 255, 255, 0.08);
-            
-            --text-primary: #f3f4f6;
-            --text-secondary: #9ca3af;
-            --text-muted: #6b7280;
-            
-            /* Branding colors */
-            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
-            --accent-glow: rgba(99, 102, 241, 0.5);
-            --success-color: #10b981;
-            
-            /* Message Bubbles */
-            --bubble-user: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
-            --bubble-bot: rgba(31, 41, 55, 0.85);
-            
-            /* Transitions */
-            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        /* Reset and Base Styles */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-primary);
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            
-            /* Background glow blobs using gradients */
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 45%);
-        }
-
-        /* ==========================================================================
-           MAIN CHAT WIDGET LAYOUT (GLASSMORPHISM)
-           ========================================================================== */
-        .chat-container {
-            width: 90%;
-            max-width: 500px;
-            height: 85vh;
-            max-height: 750px;
-            background: var(--bg-card);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--border-light);
-            border-radius: 24px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4),
-                        0 0 40px var(--border-glow);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
-            animation: container-entrance 0.8s ease-out;
-        }
-
-        /* Container Entrance Keyframe */
-        @keyframes container-entrance {
-            from {
-                opacity: 0;
-                transform: translateY(30px) scale(0.97);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        /* ==========================================================================
-           HEADER COMPONENT
-           ========================================================================== */
-        .chat-header {
-            padding: 20px 24px;
-            background: rgba(17, 24, 39, 0.4);
-            border-bottom: 1px solid var(--border-light);
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .avatar-container {
-            position: relative;
-            width: 48px;
-            height: 48px;
-            background: var(--primary-gradient);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
-        }
-
-        .avatar-container svg {
-            width: 24px;
-            height: 24px;
-            fill: #ffffff;
-        }
-
-        /* Online Status Indicator Dot */
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            background-color: var(--success-color);
-            border: 2px solid #0e131f;
-            border-radius: 50%;
-            position: absolute;
-            bottom: 1px;
-            right: 1px;
-            box-shadow: 0 0 8px var(--success-color);
-            animation: pulse-glow 2s infinite;
-        }
-
-        @keyframes pulse-glow {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
-
-        .header-info h1 {
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.15rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            margin-bottom: 2px;
-        }
-
-        .header-info p {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        /* ==========================================================================
-           CHAT WINDOW / DIALOG AREA
-           ========================================================================== */
-        .chat-log {
-            flex: 1;
-            padding: 24px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
-        }
-
-        .chat-log::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .chat-log::-webkit-scrollbar-thumb {
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-        }
-
-        /* Message Bubble Styles */
-        .message {
-            max-width: 80%;
-            padding: 14px 18px;
-            border-radius: 18px;
-            font-size: 0.92rem;
-            line-height: 1.5;
-            animation: message-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            opacity: 0;
-            transform: translateY(12px);
-        }
-
-        @keyframes message-slide-in {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Bot Message Details */
-        .message.bot {
-            align-self: flex-start;
-            background: var(--bubble-bot);
-            border: 1px solid var(--border-light);
-            border-top-left-radius: 4px;
-            color: var(--text-primary);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-        }
-
-        /* User Message Details */
-        .message.user {
-            align-self: flex-end;
-            background: var(--bubble-user);
-            border-top-right-radius: 4px;
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
-        }
-
-        /* ==========================================================================
-           TYPING INDICATOR
-           ========================================================================== */
-        .typing-indicator {
-            display: none;
-            align-self: flex-start;
-            background: var(--bubble-bot);
-            border: 1px solid var(--border-light);
-            border-radius: 18px;
-            border-top-left-radius: 4px;
-            padding: 14px 20px;
-            gap: 6px;
-            align-items: center;
-        }
-
-        .typing-dot {
-            width: 8px;
-            height: 8px;
-            background-color: var(--text-secondary);
-            border-radius: 50%;
-            animation: dot-bounce 1.4s infinite ease-in-out both;
-        }
-
-        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-
-        @keyframes dot-bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
-        }
-
-        /* ==========================================================================
-           INLINE SUPPORT TICKET FORM
-           ========================================================================== */
-        .ticket-form-card {
-            align-self: flex-start;
-            width: 85%;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-light);
-            border-radius: 16px;
-            padding: 18px;
-            margin-top: 6px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            animation: message-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-        }
-
-        .ticket-form-card h3 {
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: #ffffff;
-            margin-bottom: 2px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .ticket-form-card h3 svg {
-            width: 16px;
-            height: 16px;
-            fill: #6366f1;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .form-group label {
-            font-size: 0.72rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .form-group input, .form-group textarea {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            padding: 10px 12px;
-            font-family: inherit;
-            font-size: 0.85rem;
-            color: var(--text-primary);
-            outline: none;
-            transition: var(--transition-smooth);
-        }
-
-        .form-group input:focus, .form-group textarea:focus {
-            border-color: rgba(99, 102, 241, 0.5);
-            background: rgba(255, 255, 255, 0.07);
-        }
-
-        .ticket-submit-btn {
-            background: var(--primary-gradient);
-            color: #ffffff;
-            border: none;
-            border-radius: 8px;
-            padding: 10px;
-            font-family: inherit;
-            font-size: 0.85rem;
-            font-weight: 500;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-            transition: var(--transition-smooth);
-        }
-
-        .ticket-submit-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
-        }
-
-        .ticket-submit-btn:disabled {
-            background: var(--text-muted);
-            cursor: not-allowed;
-            box-shadow: none;
-            transform: none;
-        }
-
-        /* Inline Ticket Suggestion Button */
-        .escalate-btn {
-            background: rgba(99, 102, 241, 0.12);
-            border: 1px solid rgba(99, 102, 241, 0.3);
-            color: #ffffff;
-            border-radius: 8px;
-            padding: 8px 14px;
-            font-family: inherit;
-            font-size: 0.78rem;
-            font-weight: 500;
-            cursor: pointer;
-            margin-top: 10px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: var(--transition-smooth);
-        }
-
-        .escalate-btn:hover {
-            background: rgba(99, 102, 241, 0.25);
-            border-color: rgba(99, 102, 241, 0.5);
-            transform: translateY(-1px);
-        }
-
-        .escalate-btn svg {
-            width: 14px;
-            height: 14px;
-            fill: #ffffff;
-        }
-
-        /* ==========================================================================
-           QUICK SUGGESTION CHIPS
-           ========================================================================== */
-        .suggestion-bar {
-            padding: 10px 20px;
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            background: rgba(17, 24, 39, 0.2);
-            border-top: 1px solid rgba(255, 255, 255, 0.03);
-            scrollbar-width: none;
-        }
-
-        .suggestion-bar::-webkit-scrollbar {
-            display: none; /* Hide scrollbar for layout cleanliness */
-        }
-
-        .chip {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-light);
-            border-radius: 50px;
-            padding: 8px 16px;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            cursor: pointer;
-            white-space: nowrap;
-            transition: var(--transition-smooth);
-        }
-
-        .chip:hover {
-            background: rgba(99, 102, 241, 0.15);
-            border-color: rgba(99, 102, 241, 0.4);
-            color: #ffffff;
-            transform: translateY(-2px);
-        }
-
-        /* ==========================================================================
-           INPUT CONTROLS
-           ========================================================================== */
-        .chat-input-area {
-            padding: 16px 20px;
-            background: rgba(17, 24, 39, 0.6);
-            border-top: 1px solid var(--border-light);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .input-wrapper {
-            position: relative;
-            flex: 1;
-        }
-
-        /* Custom Input Styling */
-        .chat-input {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-light);
-            border-radius: 14px;
-            padding: 14px 18px;
-            font-family: inherit;
-            font-size: 0.92rem;
-            color: var(--text-primary);
-            outline: none;
-            transition: var(--transition-smooth);
-        }
-
-        .chat-input:focus {
-            border-color: rgba(99, 102, 241, 0.6);
-            background: rgba(255, 255, 255, 0.07);
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
-        }
-
-        .chat-input::placeholder {
-            color: var(--text-muted);
-        }
-
-        /* Send Icon Button */
-        .send-btn {
-            background: var(--primary-gradient);
-            border: none;
-            border-radius: 14px;
-            width: 48px;
-            height: 48px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-            transition: var(--transition-smooth);
-        }
-
-        .send-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
-        }
-
-        .send-btn:active {
-            transform: scale(0.95);
-        }
-
-        .send-btn svg {
-            width: 20px;
-            height: 20px;
-            fill: #ffffff;
-            transition: transform 0.3s ease;
-        }
-
-        .send-btn:hover svg {
-            transform: translate(2px, -2px) rotate(-15deg);
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <main class="chat-container">
-        <!-- Header Section -->
-        <header class="chat-header">
-            <div class="avatar-container">
-                <!-- Robotic support bot SVG icon -->
-                <svg viewBox="0 0 24 24">
-                    <path d="M19 8h-1.07C17.43 5.09 14.97 3 12 3S6.57 5.09 6.07 8H5c-1.1 0-2 .9-2 2v4c0 1.1.9 2 2 2h1.07c.5 2.91 2.96 5 6.03 5s5.53-2.09 6.03-5H19c1.1 0 2-.9 2-2v-4c0-1.1-.9-2-2-2zM9 9c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm6 5H9v-2h6v2zm-2-3c0 .55-.45 1-1 1s-1-.45-1-1 .45-1 1-1 1 .45 1 1zm3 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/>
-                </svg>
-                <div class="status-dot" id="status-indicator"></div>
+    <div class="app-container">
+
+        <!-- Mobile sidebar backdrop -->
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-top">
+                <div class="sidebar-brand">
+                    <svg class="icon icon-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    <span>NORTHSTAR</span>
+                </div>
+                <button class="icon-btn sidebar-close" id="sidebar-close-btn" aria-label="Close sidebar">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
             </div>
-            <div class="header-info">
-                <h1>Northstar Assistant</h1>
-                <p>Online • MVP Support Deflection</p>
+
+            <div class="sidebar-new-chat-wrap">
+                <button class="new-chat-btn" id="new-chat-btn">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    New chat
+                </button>
             </div>
-        </header>
 
-        <!-- Message Window Logs -->
-        <section class="chat-log" id="chat-window">
-            <div class="message bot">
-                Hello! I am the Northstar Assistant. I can help check your order status or item stock levels. Try typing a query or selecting one of the suggestions below!
+            <div class="sidebar-stats">
+                <span class="stat-chip stat-chip-amber">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>
+                    <span id="deflected-count">0</span>
+                </span>
+                <span class="stat-chip stat-chip-slate">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span id="escalated-count">0</span>
+                </span>
             </div>
-            
-            <!-- Live typing indicator -->
-            <div class="typing-indicator" id="bot-typing">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
+
+            <p class="sidebar-offline-note" id="offline-note" hidden>Backend offline</p>
+
+            <p class="sidebar-section-label">History</p>
+            <div class="thread-list" id="thread-list"></div>
+        </aside>
+
+        <!-- Main column -->
+        <div class="main-col">
+            <header class="main-header">
+                <button class="icon-btn sidebar-open" id="sidebar-open-btn" aria-label="Open history">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></svg>
+                </button>
+                <div class="main-header-text">
+                    <p class="main-header-title" id="thread-title">New conversation</p>
+                    <p class="main-header-subtitle">Deflection MVP · v0.3</p>
+                </div>
+            </header>
+
+            <main class="chat-log" id="chat-log"></main>
+
+            <div class="category-bar-wrap">
+                <div class="category-bar" id="category-bar">
+                    <button class="category-chip" data-intent="order_status">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+                        Track an order
+                    </button>
+                    <button class="category-chip" data-intent="returns_refund">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        Return or refund
+                    </button>
+                    <button class="category-chip" data-intent="stock_availability">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        Check stock
+                    </button>
+                    <button class="category-chip" data-intent="human">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        Talk to a human
+                    </button>
+                </div>
             </div>
-        </section>
 
-        <!-- Suggestion Chips Bar -->
-        <section class="suggestion-bar">
-            <button class="chip" onclick="applySuggestion('Where is my order 1001?')">Track Order 1001</button>
-            <button class="chip" onclick="applySuggestion('Is the blue sneakers in stock?')">Check Stock: Blue Sneakers</button>
-            <button class="chip" onclick="applySuggestion('I need to speak to support')">Talk to Human</button>
-        </section>
-
-        <!-- Input Section -->
-        <!-- Typing Enter key inside this text input triggers form submit action automatically -->
-        <form class="chat-input-area" id="chat-input-form" onsubmit="sendMessage(event)">
-            <div class="input-wrapper">
-                <input type="text" id="user-input" class="chat-input" placeholder="Ask about an order or product stock..." autocomplete="off" required>
+            <div class="input-bar">
+                <div class="input-bar-inner">
+                    <input type="text" id="chat-input" class="chat-input" placeholder="Type your question..." autocomplete="off">
+                    <button id="send-btn" class="send-btn" aria-label="Send message">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                        Send
+                    </button>
+                </div>
             </div>
-            <button type="submit" id="send-button" class="send-btn" aria-label="Send message">
-                <!-- Send Paper Plane SVG icon -->
-                <svg viewBox="0 0 24 24">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
-            </button>
-        </form>
-    </main>
+        </div>
 
-    <script>
-        // DOM Elements
-        const chatWindow = document.getElementById('chat-window');
-        const userInput = document.getElementById('user-input');
-        const typingIndicator = document.getElementById('bot-typing');
-
-        /**
-         * Appends a message bubble to the chat logs
-         * @param {string} text - Message text
-         * @param {boolean} isUser - True if sender is user, false for bot
-         */
-        function appendMessage(text, isUser) {
-            const bubble = document.createElement('div');
-            bubble.classList.add('message');
-            bubble.classList.add(isUser ? 'user' : 'bot');
-            bubble.textContent = text;
-
-            // Insert new message bubbles before the typing indicator
-            chatWindow.insertBefore(bubble, typingIndicator);
-            
-            // Auto scroll to the bottom of the container
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-            return bubble;
-        }
-
-        /**
-         * Triggers typing animation and queries the backend API
-         * @param {string} text - The query string
-         */
-        async function fetchBotResponse(text) {
-            // Show typing indicator
-            typingIndicator.style.display = 'flex';
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-
-            try {
-                // Query Flask Backend - targeting the '/chat' endpoint exactly
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: text })
-                });
-
-                if (!response.ok) {
-                    throw new Error('API server returned error status');
-                }
-
-                const data = await response.json();
-                
-                // Hide typing indicator
-                typingIndicator.style.display = 'none';
-                
-                // Append bot message bubble
-                appendMessage(data.response, false);
-
-                // Check metadata flags returned by the backend routing
-                if (data.show_ticket_form) {
-                    renderTicketForm(data.prefilled_order_id);
-                } else if (data.suggest_ticket) {
-                    renderTicketSuggestion(data.prefilled_order_id);
-                }
-
-            } catch (error) {
-                console.error('Error fetching response:', error);
-                
-                // Hide typing indicator
-                typingIndicator.style.display = 'none';
-                
-                // Append standard customer support failure message instead of silently failing
-                appendMessage('Something went wrong, please try again.', false);
-            }
-        }
-
-        /**
-         * Appends a small button suggesting opening a ticket if order wasn't found
-         * @param {string} orderId - Optional prefilled order ID
-         */
-        function renderTicketSuggestion(orderId) {
-            const btn = document.createElement('button');
-            btn.classList.add('escalate-btn');
-            btn.innerHTML = `
-                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                Open Support Ticket
-            `;
-            btn.onclick = () => {
-                btn.remove();
-                renderTicketForm(orderId);
-            };
-            
-            chatWindow.insertBefore(btn, typingIndicator);
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-        }
-
-        /**
-         * Appends an interactive ticket creation form inline in the chat
-         * @param {string} orderId - Prefilled order ID value
-         */
-        function renderTicketForm(orderId) {
-            // Check if form already exists to prevent duplicate forms
-            if (document.querySelector('.ticket-form-card')) return;
-
-            const formCard = document.createElement('div');
-            formCard.classList.add('ticket-form-card');
-            
-            formCard.innerHTML = `
-                <h3>
-                    <svg viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1 1 .45 1 1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-                    Submit Support Ticket
-                </h3>
-                <form id="support-ticket-form" onsubmit="submitTicket(event, '${orderId || ''}')">
-                    <div class="form-group">
-                        <label for="ticket-name">Name</label>
-                        <input type="text" id="ticket-name" required placeholder="John Doe">
+        <!-- Talk to a human modal -->
+        <div class="modal-overlay" id="human-modal-overlay" hidden>
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div class="modal-header-title">
+                        <svg class="icon icon-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span>Talk to a human</span>
                     </div>
-                    <div class="form-group">
-                        <label for="ticket-email">Email</label>
-                        <input type="email" id="ticket-email" required placeholder="john@example.com">
+                    <button class="icon-btn" id="modal-close-btn" aria-label="Close">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="modal-copy">Leave your details and a message, a Northstar agent will follow up by email.</p>
+
+                    <div class="form-field">
+                        <label for="human-name">Name</label>
+                        <input type="text" id="human-name" placeholder="Jane Doe">
+                        <p class="form-error" id="human-name-error" hidden></p>
                     </div>
-                    <div class="form-group">
-                        <label for="ticket-order">Order ID (Optional)</label>
-                        <input type="text" id="ticket-order" value="${orderId || ''}" placeholder="e.g. 1001">
+
+                    <div class="form-field">
+                        <label for="human-email">Email</label>
+                        <div class="input-with-icon">
+                            <svg class="icon icon-sm input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                            <input type="email" id="human-email" placeholder="jane@example.com">
+                        </div>
+                        <p class="form-error" id="human-email-error" hidden></p>
                     </div>
-                    <div class="form-group">
-                        <label for="ticket-desc">Describe your issue</label>
-                        <textarea id="ticket-desc" rows="3" required placeholder="Explain what went wrong..."></textarea>
+
+                    <div class="form-field">
+                        <label for="human-message">Message</label>
+                        <textarea id="human-message" rows="3" placeholder="What do you need help with?"></textarea>
+                        <p class="form-error" id="human-message-error" hidden></p>
                     </div>
-                    <button type="submit" id="ticket-submit-btn" class="ticket-submit-btn">Submit Ticket</button>
-                </form>
-            `;
+                </div>
 
-            chatWindow.insertBefore(formCard, typingIndicator);
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-        }
+                <div class="modal-footer">
+                    <button class="modal-btn modal-btn-secondary" id="modal-cancel-btn">Cancel</button>
+                    <button class="modal-btn modal-btn-primary" id="modal-submit-btn">Send to agent</button>
+                </div>
+            </div>
+        </div>
 
-        /**
-         * Intercepts ticket form submission and submits it to /api/ticket endpoint
-         */
-        async function submitTicket(event, originalOrderId) {
-            event.preventDefault();
-            
-            const submitBtn = document.getElementById('ticket-submit-btn');
-            const nameInput = document.getElementById('ticket-name');
-            const emailInput = document.getElementById('ticket-email');
-            const orderInput = document.getElementById('ticket-order');
-            const descInput = document.getElementById('ticket-desc');
-            
-            // Disable button to prevent double clicks
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
+    </div>
 
-            const payload = {
-                customer_name: nameInput.value.trim(),
-                customer_email: emailInput.value.trim(),
-                order_id: orderInput.value.trim(),
-                issue_description: descInput.value.trim()
-            };
-
-            try {
-                const response = await fetch('/api/ticket', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.response || 'Submission failed');
-                }
-
-                // Remove the form card
-                const formCard = document.querySelector('.ticket-form-card');
-                if (formCard) formCard.remove();
-
-                // Append bot confirmation message
-                appendMessage(`Success! Support Ticket #${data.ticket_id} has been created. A human agent will review your issue and email you at ${payload.customer_email} as soon as possible.`, false);
-
-            } catch (error) {
-                console.error('Error submitting support ticket:', error);
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Ticket';
-                
-                // Add mini error note inside form
-                let errorNote = document.getElementById('ticket-error-note');
-                if (!errorNote) {
-                    errorNote = document.createElement('div');
-                    errorNote.id = 'ticket-error-note';
-                    errorNote.style.color = '#ef4444';
-                    errorNote.style.fontSize = '0.75rem';
-                    errorNote.style.marginTop = '5px';
-                    const form = document.getElementById('support-ticket-form');
-                    form.appendChild(errorNote);
-                }
-                errorNote.textContent = error.message || 'Error submitting ticket. Please check fields.';
-            }
-        }
-
-        /**
-         * Handles submitting a message from the input field
-         */
-        function sendMessage(event) {
-            event.preventDefault();
-            const text = userInput.value.trim();
-            if (!text) return;
-
-            // Display user message in UI
-            appendMessage(text, true);
-            
-            // Clear input box
-            userInput.value = '';
-
-            // Fetch and display response
-            fetchBotResponse(text);
-        }
-
-        /**
-         * Fills input field and triggers send on clicking a suggestion chip
-         */
-        function applySuggestion(text) {
-            userInput.value = text;
-            userInput.focus();
-            
-            // Dispatch a submit event on the form to run message sender logic
-            const form = document.getElementById('chat-input-form');
-            form.dispatchEvent(new Event('submit'));
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
