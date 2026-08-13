@@ -1,27 +1,22 @@
 import os
-import sqlite3
 import re
-from flask import Flask, request, jsonify, render_template
+import json
+import sqlite3
+from flask import Flask, request, jsonify, render_template, session
 
-# Import our custom chatbot logic function from chatbot.py
 from chatbot import get_response, detect_intent
 
-# Initialize the Flask application
-# template_folder tells Flask where to look for HTML files (index.html)
 app = Flask(__name__, template_folder="templates")
-app.secret_key = "northstar_support_deflection_mvp_secret"
+# Session secret — in production this should come from an environment variable
+app.secret_key = os.environ.get("FLASK_SECRET", "northstar_support_deflection_secret_2026")
 
-# Locate the SQLite database path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
 
 
 @app.route("/")
 def index():
-    """
-    GET Route: Renders and serves the main chatbot UI page.
-    When you visit http://127.0.0.1:5000/ in a browser, this function runs.
-    """
+    """Renders the main chatbot UI."""
     return render_template("index.html")
 
 
@@ -29,63 +24,55 @@ def index():
 @app.route("/api/chat", methods=["POST"])
 def chat():
     """
-    POST Route: Receives the user's typed message, queries the database chatbot,
-    and returns a JSON response containing the chatbot's text.
-    Supports both JSON payloads and standard Form submissions.
+    POST Route: Receives the user message, passes it through the chatbot engine
+    along with the server-side session, and returns a JSON response.
     """
     try:
         user_message = ""
-        
-        # 1. Parse the request message from JSON or standard HTML Form data
+
         if request.is_json:
             data = request.get_json()
             if data and "message" in data:
                 user_message = data["message"]
         else:
             user_message = request.form.get("message", "")
-            
-        # Validate that we have a message to process
-        if not user_message and user_message != "":
-            return jsonify({
-                "status": "error",
-                "response": "Please enter a message to chat."
-            }), 400
-            
-        # 2. Query our chatbot core logic to retrieve the bot response text
-        bot_reply = get_response(user_message)
-        
-        # 3. Detect intent to provide metadata flags for the frontend (like ticket forms)
-        intent = detect_intent(user_message)
-        
-        show_ticket_form = False
-        suggest_ticket = False
-        prefilled_order_id = ""
-        
-        if intent == "support":
-            show_ticket_form = True
-        elif "couldn't find order" in bot_reply:
-            suggest_ticket = True
-            # Attempt to extract order ID from user query to prefill form
-            match = re.search(r'order\s*(?:#\s*)?([a-zA-Z0-9]+)', user_message.lower())
-            if match:
-                prefilled_order_id = match.group(1)
-        
-        # 4. Return response payload back to the browser Javascript
+
+        # Build a plain dict from Flask's session proxy to pass to chatbot
+        chat_session = {
+            "pending_context": session.get("pending_context"),
+            "order_lookup_attempts": session.get("order_lookup_attempts", 0),
+            "stock_lookup_attempts": session.get("stock_lookup_attempts", 0),
+            "escalated": session.get("escalated", False),
+        }
+        # Remove None values so chatbot's `.get()` defaults work cleanly
+        chat_session = {k: v for k, v in chat_session.items() if v is not None}
+
+        # Run chatbot logic — session dict is mutated in-place
+        result = get_response(user_message, chat_session)
+
+        # Write mutations back into Flask session
+        session["pending_context"] = chat_session.get("pending_context")
+        session["order_lookup_attempts"] = chat_session.get("order_lookup_attempts", 0)
+        session["stock_lookup_attempts"] = chat_session.get("stock_lookup_attempts", 0)
+        session["escalated"] = chat_session.get("escalated", False)
+
         return jsonify({
             "status": "success",
-            "response": bot_reply,
-            "intent": intent,
-            "show_ticket_form": show_ticket_form,
-            "suggest_ticket": suggest_ticket,
-            "prefilled_order_id": prefilled_order_id
+            "response": result["response"],
+            "show_ticket_form": result.get("show_ticket_form", False),
+            "suggest_ticket": result.get("suggest_ticket", False),
+            "escalated": result.get("escalated", False),
+            "prefilled_order_id": result.get("prefilled_order_id", ""),
         })
-        
+
     except Exception as e:
-        # Wrap everything in try/except to prevent 500 error pages
-        # Returns a friendly JSON error message instead of crashing
         return jsonify({
             "status": "error",
-            "response": "I encountered an error processing your query. Please try again."
+            "response": "I encountered an error — please try again in a moment.",
+            "show_ticket_form": False,
+            "suggest_ticket": False,
+            "escalated": False,
+            "prefilled_order_id": "",
         }), 500
 
 
@@ -93,67 +80,66 @@ def chat():
 def create_ticket():
     """
     POST Route: Creates a support ticket in the SQLite database.
-    Expects customer_name, customer_email, issue_description, and optional order_id.
+    Expects: customer_name, customer_email, issue_description, optional order_id.
     """
     try:
-        # Check input source (JSON vs Form Data)
         if request.is_json:
             data = request.get_json()
         else:
             data = request.form
-            
+
         if not data:
-            return jsonify({
-                "status": "error",
-                "response": "Missing form data."
-            }), 400
-            
+            return jsonify({"status": "error", "response": "Missing form data."}), 400
+
         customer_name = data.get("customer_name", "").strip()
         customer_email = data.get("customer_email", "").strip()
         issue_description = data.get("issue_description", "").strip()
         order_id = data.get("order_id", "").strip()
-        
-        # Validate inputs
+
         if not customer_name or not customer_email or not issue_description:
-            return jsonify({
-                "status": "error",
-                "response": "Please fill out all required fields."
-            }), 400
-            
+            return jsonify({"status": "error", "response": "Please fill out all required fields."}), 400
+
         if "@" not in customer_email or "." not in customer_email:
-            return jsonify({
-                "status": "error",
-                "response": "Please enter a valid email address."
-            }), 400
-            
-        # Save to SQLite tickets table
+            return jsonify({"status": "error", "response": "Please enter a valid email address."}), 400
+
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO tickets (order_id, customer_name, customer_email, issue_description)
             VALUES (?, ?, ?, ?);
-        """, (order_id if order_id else None, customer_name, customer_email, issue_description))
+            """,
+            (order_id if order_id else None, customer_name, customer_email, issue_description),
+        )
         ticket_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        
+
+        # Mark session as escalated once ticket is submitted
+        session["escalated"] = True
+
         return jsonify({
             "status": "success",
             "ticket_id": ticket_id,
-            "message": f"Successfully created Support Ticket #{ticket_id}."
+            "message": f"Support ticket #{ticket_id} created successfully.",
         })
-        
-    except Exception as e:
+
+    except Exception:
         return jsonify({
             "status": "error",
-            "response": "Could not create support ticket. Please try again later."
+            "response": "Could not create support ticket — please try again.",
         }), 500
+
+
+@app.route("/api/session/reset", methods=["POST"])
+def reset_session():
+    """Clears the chatbot session state so the user can start fresh."""
+    session.clear()
+    return jsonify({"status": "success", "message": "Session reset."})
 
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Starting Northstar Web Chatbot on http://127.0.0.1:5000")
+    print("Starting Northstar Assistant on http://127.0.0.1:5000")
     print("=" * 60)
-    # Runs the server locally in debug mode
-    # debug=True automatically reloads the server when code files change
     app.run(host="127.0.0.1", port=5000, debug=True)
