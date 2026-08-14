@@ -193,6 +193,9 @@ _STOP_WORDS = {
     'about', 'for', 'me', 'i', 'want', 'need', 'it', 'some', 'get', 'there',
     'can', 'could', 'would', 'has', 'had', 'my', 'your', 'we', 'they', 'our',
     'please', 'just', 'also', 'and', 'or', 'with', 'from', 'that', 'this',
+    # Generic/vague words that are not product names
+    'anything', 'something', 'everything', 'nothing', 'stuff', 'things',
+    'items', 'products', 'one', 'ones', 'more', 'other', 'another', 'many',
 }
 
 
@@ -492,10 +495,10 @@ def get_response(user_text: str, session: dict) -> dict:
         # ----- Immediate escalation -----
         if intent == "escalate_immediate":
             if session.get("escalated"):
-                # Already connected — don't reopen the form, just reassure
+                # Already connected — remind them the form is waiting
                 return {
-                    "response": "You're already connected with our support team — they'll follow up by email shortly.",
-                    "show_ticket_form": False,
+                    "response": "You're already connected — please fill in the form below so the agent has your details.",
+                    "show_ticket_form": True,
                     "escalated": True,
                     "suggest_ticket": False,
                     "prefilled_order_id": "",
@@ -542,14 +545,39 @@ def get_response(user_text: str, session: dict) -> dict:
                 session["product_candidates"] = candidates
             else:
                 session.pop("product_candidates", None)
+
+            # If the user named something specific but it matches nothing in the
+            # catalog at all (zero partial matches), redirect rather than loop.
+            if product is None and not candidates:
+                t = str(user_text).lower()
+                leftover = set(re.sub(r'[^\w\s]', '', t).split()) - _STOP_WORDS
+                if leftover:  # user named something specific, not a generic query
+                    return {
+                        "response": "I don't think we carry that — I can help with order tracking and stock checks for the items we sell, or connect you with a support agent.",
+                        "show_ticket_form": False,
+                        "escalated": False,
+                        "suggest_ticket": False,
+                        "prefilled_order_id": "",
+                    }
+
             return _handle_stock(product, session)
 
-        # ----- Unknown intent -----
+        # ----- Unknown intent — last-chance product match -----
+        # e.g. "are boots in" has no stock keyword but "boots" → "red boots"
+        known = _all_product_names()
+        product, candidates = _extract_product_name(user_text, known)
+        if product or candidates:
+            if candidates:
+                session["product_candidates"] = candidates
+            else:
+                session.pop("product_candidates", None)
+            return _handle_stock(product, session)
+
         if session.get("escalated"):
-            # Already connected — just acknowledge, don't reopen the form
+            # Already connected — scroll back to the waiting form
             return {
-                "response": "I can help with order tracking and stock checks in the meantime — or just wait for the agent to follow up.",
-                "show_ticket_form": False,
+                "response": "I can help with order tracking and stock checks in the meantime — or fill in the form below and the agent will follow up.",
+                "show_ticket_form": True,
                 "escalated": True,
                 "suggest_ticket": False,
                 "prefilled_order_id": "",
@@ -652,15 +680,22 @@ if __name__ == "__main__":
             lambda r, s: "out of stock" in r["response"].lower(),
         ),
         (
-            # First time: can't find product → bot asks clarifying question
-            "Stock check — unknown product (1st attempt → clarifying question)",
+            # Specific item not in catalog → redirect, not clarifying question
+            "Stock check — unknown product (specific item not in catalog)",
             "Is the purple hat available?",
+            {},
+            lambda r, s: "don't think we carry" in r["response"].lower(),
+        ),
+        (
+            # Generic stock query (no product named) → clarifying question
+            "Stock check — generic query → clarifying question",
+            "What do you have in stock?",
             {},
             lambda r, s: s.get("pending_context") == "awaiting_product_name",
         ),
         (
-            # Second time: user still names an unknown product → auto-escalate
-            "Stock check — unknown product (2nd attempt → escalate)",
+            # In pending context, still no match → count as failure, escalate after 3
+            "Stock check — repeated no-match in pending context → escalate",
             "The purple hat",
             {"stock_lookup_attempts": 2, "pending_context": "awaiting_product_name"},
             lambda r, s: r["show_ticket_form"] is True,
@@ -690,10 +725,10 @@ if __name__ == "__main__":
             lambda r, s: r["show_ticket_form"] is True,
         ),
         (
-            "Already escalated → hold state",
+            "Already escalated → remind of waiting form",
             "Can I still get help?",
             {"escalated": True},
-            lambda r, s: r["escalated"] is True and r["show_ticket_form"] is False,
+            lambda r, s: r["escalated"] is True and r["show_ticket_form"] is True,
         ),
         (
             "Empty string",
