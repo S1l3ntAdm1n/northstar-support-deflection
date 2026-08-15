@@ -1,5 +1,5 @@
 // Point this at your Flask backend. Edit if your backend runs elsewhere.
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = "/api";
 
 // ---------------------------------------------------------------------------
 // Intent matching (client-side only - the actual data lives in Flask)

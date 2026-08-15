@@ -138,6 +138,224 @@ def reset_session():
     return jsonify({"status": "success", "message": "Session reset."})
 
 
+# ==========================================================================
+# REST API ENDPOINTS FOR CLIENT-SIDE CHATBOT WIRING
+# ==========================================================================
+
+def init_logs_table():
+    """Initialize the interaction_logs table if it does not exist."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interaction_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_message TEXT,
+                intent TEXT,
+                deflected INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error initializing interaction_logs: {e}")
+
+# Run log table init
+init_logs_table()
+
+
+@app.route("/api/tickets", methods=["GET"])
+def get_tickets_summary():
+    """Returns a count of deflected vs escalated interactions."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Count deflected interactions
+        cursor.execute("SELECT COUNT(*) FROM interaction_logs WHERE deflected = 1;")
+        deflected = cursor.fetchone()[0]
+        
+        # Count escalated tickets
+        cursor.execute("SELECT COUNT(*) FROM tickets;")
+        escalated = cursor.fetchone()[0]
+        
+        conn.close()
+        return jsonify({
+            "summary": {
+                "deflected": deflected,
+                "escalated": escalated
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/tickets", methods=["POST"])
+def log_ticket_interaction():
+    """Logs whether a user interaction deflected or escalated a support request."""
+    try:
+        data = request.get_json() if request.is_json else request.form
+        if not data:
+            return jsonify({"status": "error", "message": "Missing data"}), 400
+            
+        user_message = data.get("user_message", "")
+        intent = data.get("intent", "")
+        deflected = data.get("deflected", False)
+        
+        # Convert boolean to 1 or 0
+        deflected_val = 1 if deflected else 0
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO interaction_logs (user_message, intent, deflected)
+            VALUES (?, ?, ?);
+        """, (user_message, intent, deflected_val))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/escalations", methods=["POST"])
+def create_escalation():
+    """Alternative ticket submission route specifically for frontend form."""
+    try:
+        data = request.get_json() if request.is_json else request.form
+        if not data:
+            return jsonify({"status": "error", "message": "Missing data"}), 400
+            
+        customer_name = data.get("name", "").strip()
+        customer_email = data.get("email", "").strip()
+        issue_description = data.get("message", "").strip()
+        
+        if not customer_name or not customer_email or not issue_description:
+            return jsonify({"status": "error", "response": "All fields are required"}), 400
+            
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO tickets (customer_name, customer_email, issue_description)
+            VALUES (?, ?, ?);
+        """, (customer_name, customer_email, issue_description))
+        ticket_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"status": "success", "ticket_id": ticket_id})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/orders/<order_id>", methods=["GET"])
+def get_order_details(order_id):
+    """Retrieves standard details about a specific order."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT product, status, ship_date, eta, tracking_update FROM orders WHERE id = ?;", (order_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            return jsonify({"status": "error", "message": "Order not found"}), 404
+            
+        product, status, ship_date, eta, tracking_update = row
+        
+        # Map database status terms to standard UI states
+        js_status = "Processing"
+        if status == "delivered":
+            js_status = "Delivered"
+        elif status in ("shipped", "delayed", "delivery_exception"):
+            js_status = "Shipped"
+            
+        return jsonify({
+            "id": order_id,
+            "status": js_status,
+            "delivered_date": eta if status == "delivered" else None,
+            "shipped_date": ship_date,
+            "carrier": "Northstar Logistics",
+            "tracking_number": f"NS-{order_id}-TRK",
+            "eta": eta,
+            "items": [product]
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/orders/<order_id>/return-eligibility", methods=["GET"])
+def check_return_eligibility(order_id):
+    """Verifies if an order is eligible for customer return."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT status FROM orders WHERE id = ?;", (order_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            return jsonify({"status": "error", "message": "Order not found"}), 404
+            
+        status = row[0]
+        if status == "delivered":
+            return jsonify({"eligible": True, "reason": "Eligible for return."})
+        else:
+            return jsonify({"eligible": False, "reason": "Only delivered orders are eligible for return."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/orders/<order_id>/return", methods=["POST"])
+def initiate_return(order_id):
+    """Triggers return request flow and issues refund estimation."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE orders SET status = 'returned' WHERE id = ?;", (order_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success", "refund_days": 5})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/stock/<product_key>", methods=["GET"])
+def get_stock(product_key):
+    """Checks catalog inventory stock count and size lists."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT product_name, sizes, quantity, restock_date FROM inventory WHERE product_name = ? OR product_name LIKE ?;", 
+                       (product_key.lower().strip(), f"%{product_key.lower().strip()}%"))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            return jsonify({"status": "error", "message": "Product not found"}), 404
+            
+        product_name, sizes, quantity, restock_date = row
+        size_list = [s.strip() for s in sizes.split(",")]
+        
+        requested_size = request.args.get("size")
+        if requested_size:
+            size_clean = requested_size.strip().lower()
+            size_list_lower = [s.lower() for s in size_list]
+            in_stock = (quantity > 0) and (size_clean in size_list_lower)
+            return jsonify({
+                "in_stock": in_stock,
+                "restock_eta": restock_date if restock_date else "date to be confirmed"
+            })
+            
+        return jsonify({
+            "sizes_in_stock": size_list
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("Starting Northstar Assistant on http://127.0.0.1:5000")
