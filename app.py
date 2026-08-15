@@ -20,6 +20,13 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/trello")
+@app.route("/tasks")
+def trello_board():
+    """Renders the team task board (Kanban)."""
+    return render_template("trello.html")
+
+
 @app.route("/chat", methods=["POST"])
 @app.route("/api/chat", methods=["POST"])
 def chat():
