@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Northstar Project - Team Task Board</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --border-color: #334155;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent-amber: #f59e0b;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: #020617;
+            padding: 16px 24px;
+            border-bottom: 4px solid var(--accent-amber);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            color: var(--accent-amber);
+            width: 28px;
+            height: 28px;
+        }
+
+        .brand-title {
+            font-family: "Courier New", monospace;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            border-color: var(--accent-amber);
+            color: var(--accent-amber);
+        }
+
+        main {
+            flex: 1;
+            padding: 24px;
+            max-width: 1280px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .board-header {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .board-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .board-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .board-columns {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            align-items: start;
+        }
+
+        .column {
+            background-color: #0b0f19;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .column-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .column-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .column-count {
+            background-color: var(--bg-card);
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-amber);
+        }
+
+        .card-label {
+            align-self: flex-start;
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .label-backend { background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+        .label-frontend { background-color: rgba(236, 72, 153, 0.15); color: #f472b6; }
+        .label-fullstack { background-color: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+        .label-devops { background-color: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .label-qa { background-color: rgba(16, 185, 129, 0.15); color: #34d399; }
+
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .card-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .card-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--border-color);
+            padding-top: 10px;
+            margin-top: 4px;
+        }
+
+        .badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.72rem;
+            color: var(--accent-green);
+            background-color: rgba(16, 185, 129, 0.1);
+            padding: 3px 6px;
+            border-radius: 4px;
+        }
+
+        .badge-icon {
+            width: 12px;
+            height: 12px;
+        }
+
+        .member-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: white;
+            border: 2px solid var(--bg-card);
+            box-shadow: 0 0 0 1px var(--border-color);
+            cursor: pointer;
+        }
+
+        .avatar-sarah { background-color: #3b82f6; }
+        .avatar-alex { background-color: #ec4899; }
+        .avatar-michael { background-color: #8b5cf6; }
+        .avatar-elena { background-color: #f59e0b; }
+        .avatar-david { background-color: #10b981; }
+
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            right: 0;
+            background-color: #020617;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            border-radius: 4px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+            z-index: 10;
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+        }
+
+        .empty-state {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 24px 12px;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-brand">
+            <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <rect x="7" y="7" width="3" height="9"/>
+                <rect x="14" y="7" width="3" height="5"/>
+            </svg>
+            <span class="brand-title">NORTHSTAR TASKS</span>
+        </div>
+        <a href="/" class="back-btn">
+            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m15 18-6-6 6-6"/>
+            </svg>
+            Back to Chat
+        </a>
+    </header>
+
+    <main>
+        <div class="board-header">
+            <h1 class="board-title">Sprint 1 Kanban</h1>
+            <p class="board-subtitle">Track, stock, and escalation features rollout team tasks</p>
+        </div>
+
+        <div class="board-columns">
+            
+            <!-- Column: TO DO -->
+            <div class="column">
+                <div class="column-header">
+                    <span class="column-title" style="color: var(--text-muted);">
+                        To Do
+                    </span>
+                    <span class="column-count">0</span>
+                </div>
+                <div class="empty-state">No pending tasks</div>
+            </div>
+
+            <!-- Column: IN PROGRESS -->
+            <div class="column">
+                <div class="column-header">
+                    <span class="column-title" style="color: var(--accent-blue);">
+                        In Progress
+                    </span>
+                    <span class="column-count">0</span>
+                </div>
+                <div class="empty-state">No active tasks</div>
+            </div>
+
+            <!-- Column: COMPLETED -->
+            <div class="column">
+                <div class="column-header">
+                    <span class="column-title" style="color: var(--accent-green);">
+                        Completed
+                    </span>
+                    <span class="column-count">5</span>
+                </div>
+
+                <!-- Sarah Task -->
+                <div class="card">
+                    <span class="card-label label-backend">Database</span>
+                    <h3 class="card-title">Setup SQLite & Mock Data Schema</h3>
+                    <p class="card-desc">Created seeding schemas for orders tracking, stock levels, and support ticket tables.</p>
+                    <div class="card-meta">
+                        <span class="badge">
+                            <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Completed
+                        </span>
+                        <div class="member-avatar avatar-sarah tooltip" data-tooltip="Sarah Jenkins (Database)">SJ</div>
+                    </div>
+                </div>
+
+                <!-- Alex Task -->
+                <div class="card">
+                    <span class="card-label label-frontend">Frontend</span>
+                    <h3 class="card-title">Glassmorphic Chat UI Designing</h3>
+                    <p class="card-desc">Coded responsive sidebar panels, suggestion chips, and modern modal overlay layout.</p>
+                    <div class="card-meta">
+                        <span class="badge">
+                            <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Completed
+                        </span>
+                        <div class="member-avatar avatar-alex tooltip" data-tooltip="Alex Rivera (Design)">AR</div>
+                    </div>
+                </div>
+
+                <!-- Michael Task -->
+                <div class="card">
+                    <span class="card-label label-fullstack">Server APIs</span>
+                    <h3 class="card-title">Flask Server REST API Integration</h3>
+                    <p class="card-desc">Linked script.js frontend queries with python backend data mappings and validation models.</p>
+                    <div class="card-meta">
+                        <span class="badge">
+                            <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Completed
+                        </span>
+                        <div class="member-avatar avatar-michael tooltip" data-tooltip="Michael Chen (Full-stack)">MC</div>
+                    </div>
+                </div>
+
+                <!-- Elena Task -->
+                <div class="card">
+                    <span class="card-label label-devops">Deployment</span>
+                    <h3 class="card-title">CI/CD Setup and Vercel Hosting</h3>
+                    <p class="card-desc">Configured vercel.json serverless rules, fixed dependency encodings, and aliased public site.</p>
+                    <div class="card-meta">
+                        <span class="badge">
+                            <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Completed
+                        </span>
+                        <div class="member-avatar avatar-elena tooltip" data-tooltip="Elena Rostova (DevOps)">ER</div>
+                    </div>
+                </div>
+
+                <!-- David Task -->
+                <div class="card">
+                    <span class="card-label label-qa">Testing</span>
+                    <h3 class="card-title">QA Verification & Edge Cases Checks</h3>
+                    <p class="card-desc">Tested order tracking proactive delays, catalog restock dates, and boundary checks.</p>
+                    <div class="card-meta">
+                        <span class="badge">
+                            <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Completed
+                        </span>
+                        <div class="member-avatar avatar-david tooltip" data-tooltip="David Kim (Quality)">DK</div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+</body>
+</html>
