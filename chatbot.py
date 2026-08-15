@@ -69,6 +69,43 @@ def _all_product_names():
         return []
 
 
+def _fetch_in_stock_alternative(exclude_product: str) -> str | None:
+    """Return the name of one in-stock product that isn't the excluded one."""
+    try:
+        conn = sqlite3.connect(_db_path())
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT product_name FROM inventory "
+            "WHERE stock_status = 'in_stock' AND product_name != ? LIMIT 1;",
+            (exclude_product.lower().strip(),),
+        )
+        row = cur.fetchone()
+        conn.close()
+        return row[0].title() if row else None
+    except Exception:
+        return None
+
+
+def _extract_size(text: str) -> str | None:
+    """Pull a requested size from free text (e.g. 'size 8', 'size M', 'in XL')."""
+    t = str(text).lower()
+    # Explicit prefix: 'size 8', 'size XL'
+    m = re.search(r'\bsize\s+([A-Za-z0-9]+(?:\.\d)?)\b', t)
+    if m:
+        return m.group(1).upper()
+    # Standalone clothing size letters (XS / S / M / L / XL / XXL / XXXL)
+    m = re.search(r'\b(xxxl|xxl|xl|xs|(?<![\w])m(?![\w])|(?<![\w])s(?![\w])|(?<![\w])l(?![\w]))\b', t)
+    if m:
+        return m.group(1).upper()
+    # Standalone shoe sizes 4–18 (e.g. '9', '10.5')
+    m = re.search(r'\b(\d{1,2}(?:\.5)?)\b', t)
+    if m:
+        val = float(m.group(1))
+        if 4 <= val <= 18:
+            return m.group(1)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # STOCK LEVEL LANGUAGE
 # ---------------------------------------------------------------------------
@@ -94,6 +131,9 @@ _ESCALATE_IMMEDIATELY = [
     "refund", "return", "damaged", "wrong item", "wrong order",
     "fraud", "chargeback", "complaint", "legal", "sue", "lawyer",
     "attorney", "scam", "stolen",
+    # Spec: cancel orders / change addresses are out of scope
+    "cancel", "cancellation", "change address", "change my address",
+    "wrong address", "update address",
 ]
 
 # Frustration signals → escalate
@@ -246,6 +286,29 @@ def _extract_product_name(text: str, known_products: list) -> tuple:
     return None, candidates                   # 0 = no match, 2+ = ambiguous
 
 
+def _find_noncatalog_words(user_text: str, known_products: list, matched_product: str) -> list:
+    """
+    Returns significant words from user_text that don't appear in any known
+    product name — i.e., words the user mentioned that we can't identify.
+    Filters out numbers (sizes), very short tokens, and words already covered
+    by the matched product itself.
+    """
+    t = str(user_text).lower()
+    user_words = set(re.sub(r'[^\w\s]', '', t).split()) - _STOP_WORDS
+
+    # Build set of every word that appears in any catalog product name
+    catalog_words: set = set()
+    for p in known_products:
+        catalog_words.update(p.lower().split())
+
+    # Exclude numbers (sizes/quantities) and very short tokens (< 3 chars)
+    unknown = [
+        w for w in sorted(user_words - catalog_words)
+        if len(w) >= 3 and not re.fullmatch(r'\d+(\.\d+)?', w)
+    ]
+    return unknown
+
+
 # ---------------------------------------------------------------------------
 # RESPONSE HANDLERS
 # ---------------------------------------------------------------------------
@@ -382,13 +445,15 @@ def _handle_order_status(order_id: str | None, session: dict) -> dict:
     }
 
 
-def _handle_stock(product_name: str | None, session: dict) -> dict:
+def _handle_stock(product_name: str | None, session: dict, user_text: str = "") -> dict:
     """
     Check stock for a product.
     Uses plain-language level descriptions.
     Asks a clarifying question if the product can't be identified.
     If multiple products partially match, asks which one the user means.
-    Auto-escalates after 2 lookup failures.
+    Auto-escalates after 3 lookup failures.
+    If out of stock, offers a similar in-stock item if one exists.
+    Respects a requested size from user_text (e.g. 'size 8' or 'XL').
     """
     if not product_name:
         # If attempts already exhausted, escalate rather than loop the question
@@ -443,19 +508,38 @@ def _handle_stock(product_name: str | None, session: dict) -> dict:
     session["stock_lookup_attempts"] = 0
     session.pop("pending_context", None)
 
-    sizes, colors, stock_status, quantity, restock_date = row
+    sizes_str, colors, stock_status, quantity, restock_date = row
     level = _stock_level_text(quantity)
+    size_list = [s.strip() for s in sizes_str.split(",")] if sizes_str else []
 
     color_part = f" in {colors}" if colors and colors.lower() not in product_name.lower() else ""
-    sizes_part = f" Available sizes: {sizes}." if sizes else ""
+
+    # Check if user specified a size
+    asked_size = _extract_size(user_text) if user_text else None
 
     if stock_status == "in_stock":
-        response = f"The {product_name.title()}{color_part} is in stock — {level}.{sizes_part}"
+        if asked_size:
+            if any(asked_size.lower() == s.lower() for s in size_list):
+                response = (
+                    f"The {product_name.title()}{color_part} is in stock in size {asked_size} — {level}."
+                )
+            else:
+                avail = ", ".join(size_list) if size_list else "sizes unavailable"
+                response = (
+                    f"The {product_name.title()}{color_part} doesn't come in size {asked_size}. "
+                    f"Available sizes: {avail}."
+                )
+        else:
+            sizes_part = f" Available sizes: {sizes_str}." if sizes_str else ""
+            response = f"The {product_name.title()}{color_part} is in stock — {level}.{sizes_part}"
     else:
-        restock_part = f" We're expecting a restock on {restock_date}." if restock_date else " No restock date yet."
+        restock_part = f" We're expecting a restock on {restock_date}." if restock_date else " No restock date confirmed yet."
+        sizes_part = f" Sizes normally available: {sizes_str}." if sizes_str else ""
+        alt = _fetch_in_stock_alternative(product_name)
+        alt_part = f" If you're flexible, {alt} is currently in stock." if alt else ""
         response = (
             f"The {product_name.title()}{color_part} is currently out of stock.{restock_part}"
-            f" Sizes normally available: {sizes}."
+            f"{sizes_part}{alt_part}"
         )
 
     return {
@@ -543,7 +627,21 @@ def get_response(user_text: str, session: dict) -> dict:
                 # Still nothing — count as a failed attempt
                 session["stock_lookup_attempts"] = session.get("stock_lookup_attempts", 0) + 1
                 session.pop("product_candidates", None)
-            return _handle_stock(product, session)
+            result = _handle_stock(product, session, user_text)
+
+            # Annotate any non-catalog words mentioned alongside the match
+            # (e.g. "boots or flowers" while awaiting product name)
+            if product and not result.get("show_ticket_form") and not result.get("escalated"):
+                all_known = _all_product_names()
+                extras = _find_noncatalog_words(user_text, all_known, product)
+                if extras:
+                    items = ", ".join(f'"{w}"' for w in extras[:2])
+                    result["response"] += (
+                        f" (By the way, I don't think we carry {items} — "
+                        "let me know if you meant something else.)"
+                    )
+
+            return result
 
         # ----- Route by fresh intent -----
         if intent == "order_status":
@@ -572,7 +670,20 @@ def get_response(user_text: str, session: dict) -> dict:
                         "prefilled_order_id": "",
                     }
 
-            return _handle_stock(product, session)
+            result = _handle_stock(product, session, user_text)
+
+            # If we found and answered a product, flag any non-catalog words
+            # the user also mentioned (e.g. "sneakers and flowers").
+            if product and not result.get("show_ticket_form") and not result.get("escalated"):
+                extras = _find_noncatalog_words(user_text, known, product)
+                if extras:
+                    items = ", ".join(f'"{w}"' for w in extras[:2])
+                    result["response"] += (
+                        f" (By the way, I don't think we carry {items} — "
+                        "let me know if you meant something else.)"
+                    )
+
+            return result
 
         # ----- Unknown intent — last-chance product match -----
         # e.g. "are boots in" has no stock keyword but "boots" → "red boots"
@@ -583,7 +694,25 @@ def get_response(user_text: str, session: dict) -> dict:
                 session["product_candidates"] = candidates
             else:
                 session.pop("product_candidates", None)
-            return _handle_stock(product, session)
+            return _handle_stock(product, session, user_text)
+
+        # No catalog product found — check for specific non-catalog words.
+        # If the user named something specific (e.g. "flowers or pots") we can
+        # answer directly without escalating. Only escalate for truly generic
+        # out-of-scope queries where there are no recognisable content words.
+        _t = str(user_text).lower()
+        _leftover = set(re.sub(r'[^\w\s]', '', _t).split()) - _STOP_WORDS
+        if _leftover and not session.get("escalated"):
+            return {
+                "response": (
+                    "I can only help with order tracking and stock checks — "
+                    "for anything else, I can connect you with a support agent."
+                ),
+                "show_ticket_form": False,
+                "escalated": False,
+                "suggest_ticket": False,
+                "prefilled_order_id": "",
+            }
 
         if session.get("escalated"):
             # Already connected — scroll back to the waiting form
@@ -731,10 +860,10 @@ if __name__ == "__main__":
             lambda r, s: r["show_ticket_form"] is True,
         ),
         (
-            "Out-of-scope query → escalation",
+            "Out-of-scope query → redirect (no form)",
             "What time do you open?",
             {},
-            lambda r, s: r["show_ticket_form"] is True,
+            lambda r, s: r["show_ticket_form"] is False and r["escalated"] is False,
         ),
         (
             "Already escalated → remind of waiting form",

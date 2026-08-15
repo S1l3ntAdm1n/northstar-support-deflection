@@ -39,10 +39,11 @@ def chat():
 
         # Build a plain dict from Flask's session proxy to pass to chatbot
         chat_session = {
-            "pending_context": session.get("pending_context"),
+            "pending_context":       session.get("pending_context"),
             "order_lookup_attempts": session.get("order_lookup_attempts", 0),
             "stock_lookup_attempts": session.get("stock_lookup_attempts", 0),
-            "escalated": session.get("escalated", False),
+            "escalated":             session.get("escalated", False),
+            "product_candidates":    session.get("product_candidates", []),
         }
         # Remove None values so chatbot's `.get()` defaults work cleanly
         chat_session = {k: v for k, v in chat_session.items() if v is not None}
@@ -51,10 +52,11 @@ def chat():
         result = get_response(user_message, chat_session)
 
         # Write mutations back into Flask session
-        session["pending_context"] = chat_session.get("pending_context")
+        session["pending_context"]       = chat_session.get("pending_context")
         session["order_lookup_attempts"] = chat_session.get("order_lookup_attempts", 0)
         session["stock_lookup_attempts"] = chat_session.get("stock_lookup_attempts", 0)
-        session["escalated"] = chat_session.get("escalated", False)
+        session["escalated"]             = chat_session.get("escalated", False)
+        session["product_candidates"]    = chat_session.get("product_candidates", [])
 
         return jsonify({
             "status": "success",
