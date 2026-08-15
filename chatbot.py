@@ -174,9 +174,21 @@ def _extract_order_id(text: str):
     """
     t = str(text).lower()
     # 1. "order" prefix — most reliable
-    m = re.search(r'order\s*#?\s*(\d+)', t)
-    if m:
-        return m.group(1)
+    order_idx = t.find('order')
+    if order_idx != -1:
+        remainder = t[order_idx + len('order'):].lstrip()
+        if remainder.startswith('#'):
+            remainder = remainder[1:].lstrip()
+
+        digits = []
+        for ch in remainder:
+            if ch.isdigit():
+                digits.append(ch)
+            else:
+                break
+
+        if digits:
+            return ''.join(digits)
     # 2. Hash prefix without "order"
     m = re.search(r'#\s*(\d+)', t)
     if m:

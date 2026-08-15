@@ -3,954 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Northstar Support Assistant — track your order, check stock, or get help from our team.">
+    <meta name="description" content="Northstar Support Deflection Chatbot MVP. Instantly track your order status, check catalog stock levels, and escalate issues.">
     <title>Northstar Support Assistant</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-
-    <style>
-        /* ==========================================================================
-           DESIGN TOKENS
-           ========================================================================== */
-        :root {
-            /* Warm neutral palette — retail / premium store feel */
-            --bg-page:         hsl(38, 18%, 95%);
-            --bg-widget:       hsl(0, 0%, 100%);
-            --bg-header:       hsl(0, 0%, 100%);
-            --bg-input-area:   hsl(38, 10%, 97%);
-
-            --border-subtle:   hsl(38, 12%, 88%);
-            --border-mid:      hsl(38, 10%, 80%);
-
-            --text-primary:    hsl(220, 15%, 15%);
-            --text-secondary:  hsl(220, 10%, 48%);
-            --text-muted:      hsl(220, 8%, 65%);
-            --text-inverse:    hsl(0, 0%, 100%);
-
-            /* Amber accent — warm, confident, not tech-purple */
-            --accent:          hsl(38, 92%, 50%);
-            --accent-dark:     hsl(33, 88%, 42%);
-            --accent-light:    hsl(42, 100%, 92%);
-
-            /* Semantic */
-            --success:         hsl(150, 55%, 42%);
-            --danger:          hsl(4, 76%, 55%);
-            --warning:         hsl(38, 92%, 50%);
-
-            /* Bubble colours */
-            --bubble-bot-bg:   hsl(220, 20%, 96%);
-            --bubble-bot-border: hsl(220, 15%, 90%);
-            --bubble-user-bg:  hsl(38, 92%, 50%);
-            --bubble-user-text: hsl(33, 60%, 12%);
-
-            /* Shadows */
-            --shadow-widget:   0 8px 32px hsla(220, 20%, 20%, 0.10),
-                               0 2px 8px  hsla(220, 20%, 20%, 0.06);
-            --shadow-sm:       0 2px 6px  hsla(220, 20%, 20%, 0.07);
-            --shadow-btn:      0 2px 8px  hsla(38, 92%, 42%, 0.30);
-
-            /* Radius */
-            --radius-widget:   20px;
-            --radius-bubble:   16px;
-            --radius-input:    12px;
-            --radius-btn:      10px;
-            --radius-chip:     100px;
-
-            /* Transitions */
-            --ease-spring:     cubic-bezier(0.16, 1, 0.3, 1);
-            --ease-smooth:     cubic-bezier(0.4, 0, 0.2, 1);
-            --duration-fast:   200ms;
-            --duration-base:   300ms;
-        }
-
-        /* ==========================================================================
-           RESET & BASE
-           ========================================================================== */
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background-color: var(--bg-page);
-            color: var(--text-primary);
-            height: 100dvh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 16px;
-
-            /* Subtle linen texture via noise pattern */
-            background-image:
-                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-        }
-
-        /* ==========================================================================
-           CHAT WIDGET SHELL
-           ========================================================================== */
-        .chat-widget {
-            width: 100%;
-            max-width: 480px;
-            height: min(88dvh, 740px);
-            background: var(--bg-widget);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-widget);
-            box-shadow: var(--shadow-widget);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            animation: widget-rise 0.55s var(--ease-spring);
-        }
-
-        @keyframes widget-rise {
-            from { opacity: 0; transform: translateY(24px) scale(0.98); }
-            to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        /* ==========================================================================
-           HEADER
-           ========================================================================== */
-        .chat-header {
-            padding: 18px 22px;
-            background: var(--bg-header);
-            border-bottom: 1px solid var(--border-subtle);
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            flex-shrink: 0;
-        }
-
-        .avatar {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: var(--accent-light);
-            border: 1.5px solid hsl(38, 55%, 80%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            position: relative;
-        }
-
-        .avatar svg {
-            width: 22px;
-            height: 22px;
-            fill: var(--accent-dark);
-        }
-
-        .status-pip {
-            width: 10px;
-            height: 10px;
-            background: var(--success);
-            border: 2px solid var(--bg-widget);
-            border-radius: 50%;
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            animation: pip-pulse 2.4s ease-in-out infinite;
-        }
-
-        @keyframes pip-pulse {
-            0%, 100% { box-shadow: 0 0 0 0 hsla(150, 55%, 42%, 0.5); }
-            60%       { box-shadow: 0 0 0 5px hsla(150, 55%, 42%, 0); }
-        }
-
-        .header-text { flex: 1; min-width: 0; }
-
-        .header-text h1 {
-            font-family: 'DM Sans', sans-serif;
-            font-size: 1rem;
-            font-weight: 700;
-            letter-spacing: -0.01em;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .header-text p {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            margin-top: 1px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .header-text p::before {
-            content: '';
-            display: inline-block;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--success);
-        }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .icon-btn {
-            width: 34px;
-            height: 34px;
-            border: 1px solid var(--border-subtle);
-            border-radius: 8px;
-            background: transparent;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-secondary);
-            transition: background var(--duration-fast) var(--ease-smooth),
-                        border-color var(--duration-fast) var(--ease-smooth),
-                        color var(--duration-fast) var(--ease-smooth);
-        }
-
-        .icon-btn:hover {
-            background: var(--accent-light);
-            border-color: hsl(38, 55%, 78%);
-            color: var(--accent-dark);
-        }
-
-        .icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
-
-        /* ==========================================================================
-           ESCALATION BANNER
-           ========================================================================== */
-        .escalation-banner {
-            display: none;
-            background: hsl(150, 40%, 95%);
-            border-bottom: 1px solid hsl(150, 35%, 82%);
-            padding: 10px 22px;
-            gap: 10px;
-            align-items: center;
-            flex-shrink: 0;
-        }
-
-        .escalation-banner.visible { display: flex; }
-
-        .escalation-banner svg {
-            width: 16px;
-            height: 16px;
-            fill: var(--success);
-            flex-shrink: 0;
-        }
-
-        .escalation-banner span {
-            font-size: 0.78rem;
-            font-weight: 500;
-            color: hsl(150, 45%, 28%);
-        }
-
-        /* ==========================================================================
-           MESSAGE LOG
-           ========================================================================== */
-        .chat-log {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            scrollbar-width: thin;
-            scrollbar-color: var(--border-mid) transparent;
-        }
-
-        .chat-log::-webkit-scrollbar { width: 5px; }
-        .chat-log::-webkit-scrollbar-thumb {
-            background: var(--border-mid);
-            border-radius: 4px;
-        }
-
-        /* Individual message bubble */
-        .message {
-            max-width: 82%;
-            padding: 12px 16px;
-            border-radius: var(--radius-bubble);
-            font-size: 0.875rem;
-            line-height: 1.55;
-            animation: msg-in 0.38s var(--ease-spring) forwards;
-            opacity: 0;
-            transform: translateY(10px);
-        }
-
-        @keyframes msg-in {
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .message.bot {
-            align-self: flex-start;
-            background: var(--bubble-bot-bg);
-            border: 1px solid var(--bubble-bot-border);
-            border-bottom-left-radius: 4px;
-            color: var(--text-primary);
-        }
-
-        .message.user {
-            align-self: flex-end;
-            background: var(--bubble-user-bg);
-            border-bottom-right-radius: 4px;
-            color: var(--bubble-user-text);
-            font-weight: 500;
-        }
-
-        /* ==========================================================================
-           TYPING INDICATOR
-           ========================================================================== */
-        .typing-indicator {
-            display: none;
-            align-self: flex-start;
-            align-items: center;
-            gap: 5px;
-            padding: 13px 16px;
-            background: var(--bubble-bot-bg);
-            border: 1px solid var(--bubble-bot-border);
-            border-radius: var(--radius-bubble);
-            border-bottom-left-radius: 4px;
-        }
-
-        .typing-dot {
-            width: 7px;
-            height: 7px;
-            background: var(--text-muted);
-            border-radius: 50%;
-            animation: dot-bounce 1.3s ease-in-out infinite both;
-        }
-
-        .typing-dot:nth-child(1) { animation-delay: -0.30s; }
-        .typing-dot:nth-child(2) { animation-delay: -0.15s; }
-        .typing-dot:nth-child(3) { animation-delay:  0s; }
-
-        @keyframes dot-bounce {
-            0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-            40%            { transform: translateY(-5px); opacity: 1; }
-        }
-
-        /* ==========================================================================
-           TICKET FORM CARD
-           ========================================================================== */
-        .ticket-card {
-            align-self: flex-start;
-            width: 88%;
-            background: var(--bg-widget);
-            border: 1px solid var(--border-subtle);
-            border-radius: 14px;
-            padding: 18px;
-            display: flex;
-            flex-direction: column;
-            gap: 13px;
-            animation: msg-in 0.38s var(--ease-spring) forwards;
-            opacity: 0;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .ticket-card-title {
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.875rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .ticket-card-title svg {
-            width: 15px;
-            height: 15px;
-            fill: var(--accent-dark);
-            flex-shrink: 0;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .form-group label {
-            font-size: 0.70rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-        }
-
-        .form-group input,
-        .form-group textarea {
-            background: var(--bg-input-area);
-            border: 1px solid var(--border-subtle);
-            border-radius: 8px;
-            padding: 9px 11px;
-            font-family: inherit;
-            font-size: 0.82rem;
-            color: var(--text-primary);
-            outline: none;
-            transition: border-color var(--duration-fast) var(--ease-smooth),
-                        box-shadow var(--duration-fast) var(--ease-smooth);
-            resize: none;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px hsla(38, 92%, 50%, 0.14);
-        }
-
-        .form-group input::placeholder,
-        .form-group textarea::placeholder { color: var(--text-muted); }
-
-        .ticket-submit-btn {
-            background: var(--accent);
-            color: var(--bubble-user-text);
-            border: none;
-            border-radius: var(--radius-btn);
-            padding: 10px;
-            font-family: inherit;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: var(--shadow-btn);
-            transition: background var(--duration-fast) var(--ease-smooth),
-                        transform var(--duration-fast) var(--ease-smooth),
-                        box-shadow var(--duration-fast) var(--ease-smooth);
-        }
-
-        .ticket-submit-btn:hover {
-            background: var(--accent-dark);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px hsla(38, 88%, 42%, 0.35);
-        }
-
-        .ticket-submit-btn:active { transform: translateY(0); }
-
-        .ticket-submit-btn:disabled {
-            background: var(--border-mid);
-            color: var(--text-muted);
-            cursor: not-allowed;
-            box-shadow: none;
-            transform: none;
-        }
-
-        .ticket-error {
-            font-size: 0.75rem;
-            color: var(--danger);
-            margin-top: -5px;
-        }
-
-        /* Suggest ticket button (inline, smaller) */
-        .suggest-btn {
-            align-self: flex-start;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 13px;
-            background: var(--accent-light);
-            border: 1px solid hsl(38, 55%, 78%);
-            border-radius: var(--radius-btn);
-            font-family: inherit;
-            font-size: 0.78rem;
-            font-weight: 500;
-            color: var(--accent-dark);
-            cursor: pointer;
-            margin-top: 2px;
-            transition: background var(--duration-fast) var(--ease-smooth),
-                        transform var(--duration-fast) var(--ease-spring);
-            animation: msg-in 0.38s var(--ease-spring) forwards;
-            opacity: 0;
-        }
-
-        .suggest-btn:hover {
-            background: hsl(38, 90%, 85%);
-            transform: translateY(-1px);
-        }
-
-        .suggest-btn svg { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; }
-
-        /* ==========================================================================
-           SUGGESTION CHIPS BAR
-           ========================================================================== */
-        .chips-bar {
-            padding: 10px 16px;
-            display: flex;
-            gap: 7px;
-            overflow-x: auto;
-            border-top: 1px solid var(--border-subtle);
-            background: var(--bg-input-area);
-            scrollbar-width: none;
-            flex-shrink: 0;
-        }
-
-        .chips-bar::-webkit-scrollbar { display: none; }
-
-        .chip {
-            flex-shrink: 0;
-            padding: 7px 14px;
-            background: var(--bg-widget);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-chip);
-            font-family: inherit;
-            font-size: 0.78rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-            cursor: pointer;
-            white-space: nowrap;
-            transition: background var(--duration-fast) var(--ease-smooth),
-                        border-color var(--duration-fast) var(--ease-smooth),
-                        color var(--duration-fast) var(--ease-smooth),
-                        transform var(--duration-fast) var(--ease-spring);
-        }
-
-        .chip:hover {
-            background: var(--accent-light);
-            border-color: hsl(38, 55%, 78%);
-            color: var(--accent-dark);
-            transform: translateY(-2px);
-        }
-
-        .chip:active { transform: translateY(0); }
-
-        /* ==========================================================================
-           INPUT AREA
-           ========================================================================== */
-        .input-area {
-            padding: 14px 16px;
-            background: var(--bg-input-area);
-            border-top: 1px solid var(--border-subtle);
-            display: flex;
-            align-items: flex-end;
-            gap: 10px;
-            flex-shrink: 0;
-        }
-
-        .input-wrapper { flex: 1; position: relative; }
-
-        #user-input {
-            width: 100%;
-            background: var(--bg-widget);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-input);
-            padding: 12px 16px;
-            font-family: inherit;
-            font-size: 0.875rem;
-            color: var(--text-primary);
-            outline: none;
-            resize: none;
-            overflow: hidden;
-            min-height: 46px;
-            max-height: 120px;
-            line-height: 1.45;
-            transition: border-color var(--duration-fast) var(--ease-smooth),
-                        box-shadow var(--duration-fast) var(--ease-smooth);
-        }
-
-        #user-input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px hsla(38, 92%, 50%, 0.12);
-        }
-
-        #user-input::placeholder { color: var(--text-muted); }
-
-        .send-btn {
-            width: 46px;
-            height: 46px;
-            background: var(--accent);
-            border: none;
-            border-radius: var(--radius-input);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: var(--shadow-btn);
-            flex-shrink: 0;
-            transition: background var(--duration-fast) var(--ease-smooth),
-                        transform var(--duration-fast) var(--ease-spring),
-                        box-shadow var(--duration-fast) var(--ease-smooth);
-        }
-
-        .send-btn:hover {
-            background: var(--accent-dark);
-            transform: scale(1.06);
-            box-shadow: 0 4px 14px hsla(38, 88%, 42%, 0.40);
-        }
-
-        .send-btn:active { transform: scale(0.94); }
-
-        .send-btn svg {
-            width: 18px;
-            height: 18px;
-            fill: var(--bubble-user-text);
-            transition: transform var(--duration-base) var(--ease-spring);
-        }
-
-        .send-btn:hover svg { transform: translate(2px, -2px) rotate(-10deg); }
-
-        /* ==========================================================================
-           RESPONSIVE ADJUSTMENTS
-           ========================================================================== */
-        @media (max-width: 520px) {
-            body { padding: 0; align-items: flex-end; }
-            .chat-widget {
-                max-width: 100%;
-                height: 100dvh;
-                border-radius: 0;
-                border: none;
-            }
-        }
-
-        @media (max-height: 600px) {
-            .chat-widget { height: 100dvh; border-radius: 0; }
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<main class="chat-widget" role="main">
+    <div class="app-container">
 
-    <!-- Header -->
-    <header class="chat-header">
-        <div class="avatar" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
-            </svg>
-            <!-- Alternate icon: headset -->
-            <div class="status-pip" aria-label="Online"></div>
-        </div>
-        <div class="header-text">
-            <h1>Northstar Assistant</h1>
-            <p>Online · Typically replies instantly</p>
-        </div>
-        <div class="header-actions">
-            <button class="icon-btn" id="reset-btn" aria-label="Start over" title="Start over">
-                <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-            </button>
-        </div>
-    </header>
+        <!-- Mobile sidebar backdrop -->
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
-    <!-- Escalation Banner (shown once agent is connected) -->
-    <div class="escalation-banner" id="escalation-banner" role="status" aria-live="polite">
-        <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-        <span>Connected with support — an agent will follow up by email within 10 minutes.</span>
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-top">
+                <div class="sidebar-brand">
+                    <svg class="icon icon-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    <span>NORTHSTAR</span>
+                </div>
+                <button class="icon-btn sidebar-close" id="sidebar-close-btn" aria-label="Close sidebar">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="sidebar-new-chat-wrap">
+                <button class="new-chat-btn" id="new-chat-btn">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    New chat
+                </button>
+            </div>
+
+            <div class="sidebar-stats">
+                <span class="stat-chip stat-chip-amber">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>
+                    <span id="deflected-count">0</span>
+                </span>
+                <span class="stat-chip stat-chip-slate">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span id="escalated-count">0</span>
+                </span>
+            </div>
+
+            <p class="sidebar-offline-note" id="offline-note" hidden>Backend offline</p>
+
+            <p class="sidebar-section-label">History</p>
+            <div class="thread-list" id="thread-list"></div>
+        </aside>
+
+        <!-- Main column -->
+        <div class="main-col">
+            <header class="main-header">
+                <button class="icon-btn sidebar-open" id="sidebar-open-btn" aria-label="Open history">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></svg>
+                </button>
+                <div class="main-header-text">
+                    <p class="main-header-title" id="thread-title">New conversation</p>
+                    <p class="main-header-subtitle">Deflection MVP · v0.3</p>
+                </div>
+            </header>
+
+            <main class="chat-log" id="chat-log"></main>
+
+            <div class="category-bar-wrap">
+                <div class="category-bar" id="category-bar">
+                    <button class="category-chip" data-intent="order_status">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+                        Track an order
+                    </button>
+                    <button class="category-chip" data-intent="returns_refund">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        Return or refund
+                    </button>
+                    <button class="category-chip" data-intent="stock_availability">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        Check stock
+                    </button>
+                    <button class="category-chip" data-intent="human">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        Talk to a human
+                    </button>
+                </div>
+            </div>
+
+            <div class="input-bar">
+                <div class="input-bar-inner">
+                    <input type="text" id="chat-input" class="chat-input" placeholder="Type your question..." autocomplete="off">
+                    <button id="send-btn" class="send-btn" aria-label="Send message">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Talk to a human modal -->
+        <div class="modal-overlay" id="human-modal-overlay" hidden>
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div class="modal-header-title">
+                        <svg class="icon icon-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span>Talk to a human</span>
+                    </div>
+                    <button class="icon-btn" id="modal-close-btn" aria-label="Close">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="modal-copy">Leave your details and a message, a Northstar agent will follow up by email.</p>
+
+                    <div class="form-field">
+                        <label for="human-name">Name</label>
+                        <input type="text" id="human-name" placeholder="Jane Doe">
+                        <p class="form-error" id="human-name-error" hidden></p>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="human-email">Email</label>
+                        <div class="input-with-icon">
+                            <svg class="icon icon-sm input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                            <input type="email" id="human-email" placeholder="jane@example.com">
+                        </div>
+                        <p class="form-error" id="human-email-error" hidden></p>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="human-message">Message</label>
+                        <textarea id="human-message" rows="3" placeholder="What do you need help with?"></textarea>
+                        <p class="form-error" id="human-message-error" hidden></p>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="modal-btn modal-btn-secondary" id="modal-cancel-btn">Cancel</button>
+                    <button class="modal-btn modal-btn-primary" id="modal-submit-btn">Send to agent</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- Message Log -->
-    <section class="chat-log" id="chat-log" aria-label="Conversation" aria-live="polite">
-        <div class="message bot" role="listitem">
-            Hey there! I'm the Northstar Assistant. I can help with <strong>order tracking</strong> and <strong>stock checks</strong> — or connect you with a human if needed. What can I help with?
-        </div>
-
-        <!-- Typing indicator — always last child before JS appends -->
-        <div class="typing-indicator" id="typing-indicator" aria-label="Assistant is typing" role="status">
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-        </div>
-    </section>
-
-    <!-- Quick Suggestion Chips -->
-    <nav class="chips-bar" id="chips-bar" aria-label="Suggested questions">
-        <button class="chip" data-msg="Where is my order 1001?">Track order #1001</button>
-        <button class="chip" data-msg="Is the blue sneakers in stock?">Blue Sneakers stock</button>
-        <button class="chip" data-msg="What's happening with order 1004?">Check order #1004</button>
-        <button class="chip" data-msg="I need to talk to a human agent">Talk to a human</button>
-    </nav>
-
-    <!-- Input Area -->
-    <form class="input-area" id="chat-form" aria-label="Send a message">
-        <div class="input-wrapper">
-            <textarea
-                id="user-input"
-                placeholder="Ask about an order or product…"
-                rows="1"
-                autocomplete="off"
-                aria-label="Your message"
-            ></textarea>
-        </div>
-        <button type="submit" class="send-btn" id="send-btn" aria-label="Send message">
-            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-        </button>
-    </form>
-
-</main>
-
-<script>
-    // ==========================================================================
-    // DOM REFS
-    // ==========================================================================
-    const chatLog        = document.getElementById('chat-log');
-    const typingIndicator = document.getElementById('typing-indicator');
-    const chatForm       = document.getElementById('chat-form');
-    const userInput      = document.getElementById('user-input');
-    const chipsBar       = document.getElementById('chips-bar');
-    const resetBtn       = document.getElementById('reset-btn');
-    const escalationBanner = document.getElementById('escalation-banner');
-
-    // ==========================================================================
-    // STATE
-    // ==========================================================================
-    let isEscalated = false;
-    let awaitingReply = false;
-
-    // ==========================================================================
-    // HELPERS
-    // ==========================================================================
-
-    /** Insert a bubble into the log, before the typing indicator */
-    function appendMessage(html, sender) {
-        const div = document.createElement('div');
-        div.classList.add('message', sender);
-        div.setAttribute('role', 'listitem');
-        div.innerHTML = html;
-        chatLog.insertBefore(div, typingIndicator);
-        scrollToBottom();
-        return div;
-    }
-
-    function scrollToBottom() {
-        chatLog.scrollTop = chatLog.scrollHeight;
-    }
-
-    function showTyping() {
-        typingIndicator.style.display = 'flex';
-        scrollToBottom();
-    }
-
-    function hideTyping() {
-        typingIndicator.style.display = 'none';
-    }
-
-    /** Escape HTML entities to prevent XSS from bot text */
-    function escapeHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    // ==========================================================================
-    // AUTO-GROW TEXTAREA
-    // ==========================================================================
-    userInput.addEventListener('input', () => {
-        userInput.style.height = 'auto';
-        userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
-    });
-
-    // Submit on Enter (Shift+Enter = newline)
-    userInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            chatForm.dispatchEvent(new Event('submit'));
-        }
-    });
-
-    // ==========================================================================
-    // CHIP CLICKS
-    // ==========================================================================
-    chipsBar.addEventListener('click', (e) => {
-        const chip = e.target.closest('.chip');
-        if (!chip) return;
-        const msg = chip.dataset.msg;
-        if (msg) sendMessage(msg);
-    });
-
-    // ==========================================================================
-    // RESET SESSION
-    // ==========================================================================
-    resetBtn.addEventListener('click', async () => {
-        try {
-            await fetch('/api/session/reset', { method: 'POST' });
-        } catch (_) {}
-
-        // Clear the UI
-        const bubbles = chatLog.querySelectorAll('.message, .ticket-card, .suggest-btn');
-        bubbles.forEach(el => el.remove());
-        isEscalated = false;
-        escalationBanner.classList.remove('visible');
-        chipsBar.style.display = '';
-
-        appendMessage(
-            "Hey there! I'm the Northstar Assistant. I can help with <strong>order tracking</strong> and <strong>stock checks</strong> — or connect you with a human if needed. What can I help with?",
-            'bot'
-        );
-        userInput.focus();
-    });
-
-    // ==========================================================================
-    // SEND MESSAGE
-    // ==========================================================================
-    chatForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const text = userInput.value.trim();
-        if (!text || awaitingReply) return;
-
-        sendMessage(text);
-        userInput.value = '';
-        userInput.style.height = 'auto';
-    });
-
-    async function sendMessage(text) {
-        if (awaitingReply) return;
-        awaitingReply = true;
-
-        appendMessage(escapeHtml(text), 'user');
-        showTyping();
-
-        try {
-            const res = await fetch('/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text }),
-            });
-
-            if (!res.ok) throw new Error('HTTP error ' + res.status);
-
-            const data = await res.json();
-            hideTyping();
-
-            appendMessage(escapeHtml(data.response), 'bot');
-
-            // Handle response flags
-            if (data.escalated || data.show_ticket_form) {
-                triggerEscalation(data.prefilled_order_id);
-            } else if (data.suggest_ticket) {
-                renderSuggestButton(data.prefilled_order_id);
-            }
-
-        } catch (err) {
-            console.error(err);
-            hideTyping();
-            appendMessage('Something went wrong — please try again in a moment.', 'bot');
-        } finally {
-            awaitingReply = false;
-        }
-    }
-
-    // ==========================================================================
-    // ESCALATION UX
-    // ==========================================================================
-
-    function triggerEscalation(prefillOrderId) {
-        // Always try to show/scroll to the form even if already escalated
-        if (!isEscalated) {
-            isEscalated = true;
-            escalationBanner.classList.add('visible');
-        }
-        renderTicketForm(prefillOrderId || '');
-    }
-
-    function renderSuggestButton(prefillOrderId) {
-        // Don't show duplicates
-        if (chatLog.querySelector('.suggest-btn')) return;
-
-        const btn = document.createElement('button');
-        btn.classList.add('suggest-btn');
-        btn.innerHTML = `
-            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-            Open support ticket
-        `;
-        btn.addEventListener('click', () => {
-            btn.remove();
-            triggerEscalation(prefillOrderId || '');
-        });
-
-        chatLog.insertBefore(btn, typingIndicator);
-        scrollToBottom();
-    }
-
-    function renderTicketForm(prefillOrderId) {
-        // If a form is already in the DOM (e.g. unsubmitted), just scroll to it
-        const existing = chatLog.querySelector('.ticket-card');
-        if (existing) {
-            chatLog.scrollTo({ top: existing.offsetTop - 16, behavior: 'smooth' });
-            existing.style.outline = '2px solid var(--accent)';
-            setTimeout(() => { existing.style.outline = ''; }, 1200);
-            return;
-        }
-
-        const card = document.createElement('div');
-        card.classList.add('ticket-card');
-        card.setAttribute('role', 'form');
-        card.setAttribute('aria-label', 'Support ticket form');
-
-        card.innerHTML = `
-            <div class="ticket-card-title">
-                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-                Contact a support agent
-            </div>
-            <div class="form-group">
-                <label for="tk-name">Your name</label>
-                <input type="text" id="tk-name" placeholder="Jane Doe" required>
-            </div>
-            <div class="form-group">
-                <label for="tk-email">Email address</label>
-                <input type="email" id="tk-email" placeholder="jane@example.com" required>
-            </div>
-            <div class="form-group">
-                <label for="tk-order">Order number <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
-                <input type="text" id="tk-order" value="${escapeHtml(prefillOrderId)}" placeholder="e.g. 1001">
-            </div>
-            <div class="form-group">
-                <label for="tk-desc">Describe your issue</label>
-                <textarea id="tk-desc" rows="3" placeholder="Tell us what's going on…" required></textarea>
-            </div>
-            <button type="button" class="ticket-submit-btn" id="tk-submit-btn">Submit to support team</button>
-            <div class="ticket-error" id="tk-error" style="display:none"></div>
-        `;
-
-        chatLog.insertBefore(card, typingIndicator);
-        scrollToBottom();
-
-        document.getElementById('tk-submit-btn').addEventListener('click', submitTicket);
-    }
-
-    async function submitTicket() {
-        const submitBtn  = document.getElementById('tk-submit-btn');
-        const nameInput  = document.getElementById('tk-name');
-        const emailInput = document.getElementById('tk-email');
-        const orderInput = document.getElementById('tk-order');
-        const descInput  = document.getElementById('tk-desc');
-        const errorEl    = document.getElementById('tk-error');
-
-        errorEl.style.display = 'none';
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting…';
-
-        try {
-            const res = await fetch('/api/ticket', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    customer_name:     nameInput.value.trim(),
-                    customer_email:    emailInput.value.trim(),
-                    order_id:          orderInput.value.trim(),
-                    issue_description: descInput.value.trim(),
-                }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) throw new Error(data.response || 'Submission failed');
-
-            // Replace the form with a success message
-            const card = document.querySelector('.ticket-card');
-            if (card) card.remove();
-
-            appendMessage(
-                `✓ Ticket <strong>#${data.ticket_id}</strong> submitted. A support agent will email <strong>${escapeHtml(emailInput.value.trim())}</strong> within 10 minutes.`,
-                'bot'
-            );
-
-        } catch (err) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Submit to support team';
-            errorEl.textContent = err.message || 'Could not submit ticket — please try again.';
-            errorEl.style.display = 'block';
-        }
-    }
-</script>
-
+    <script src="script.js"></script>
 </body>
 </html>
